@@ -1,0 +1,104 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: vector-collector
+    product: openshift
+  namespace: vector
+  name: vector-collector
+spec:
+  selector:
+    matchLabels:
+      app: vector-collector
+      product: openshift
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: vector-collector
+        product: openshift
+    spec:
+      tolerations:
+        - operator: Exists
+      affinity:
+        nodeAffinity:
+           requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: node.openshift.io/os_id
+                operator: In
+                values:
+                - "rhcos"
+      restartPolicy: Always
+      hostNetwork: true
+      containers:
+        - name: vector-collector
+          image: docker.io/ruo91/vector-collector:latest
+          command:
+            - /vector/bin/vector
+          args:
+            - '-vv'
+            - '--config'
+            - /vector/config/vector.toml
+          ports:
+          - containerPort: 8686
+            name: vector-api
+            protocol: TCP
+          securityContext:
+            #privileged: true
+            #runAsUser: 0
+            seLinuxOptions:
+              type: spc_t
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8686
+              scheme: HTTP
+            initialDelaySeconds: 60
+            timeoutSeconds: 5
+            periodSeconds: 10
+            successThreshold: 1
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8686
+              scheme: HTTP
+            initialDelaySeconds: 10
+            timeoutSeconds: 3
+            periodSeconds: 3
+            successThreshold: 1
+            failureThreshold: 3
+          volumeMounts:
+            - name: vector-data-volume
+              mountPath: /vector/data
+            - name: vector-config-volume
+              readOnly: true
+              mountPath: /vector/config
+            - name: varlogpods
+              readOnly: true
+              mountPath: /var/log/pods
+            - name: varlogcontainers
+              readOnly: true
+              mountPath: /var/log/containers
+      volumes:
+        - name: vector-data-volume
+          persistentVolumeClaim:
+            claimName: vector-data-pvc
+        - name: vector-config-volume
+          configMap:
+            name: vector-config
+            defaultMode: 420
+            items:
+              - key: vector.toml
+                path: vector.toml
+        - name: varlogpods
+          hostPath:
+            path: /var/log/pods
+            type: ''
+        - name: varlogcontainers
+          hostPath:
+            path: /var/log/containers
+            type: ''

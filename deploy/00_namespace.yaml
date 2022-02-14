@@ -1,0 +1,10 @@
+# Create Namespaces
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: vector
+  annotations:
+    openshift.io/node-selector: ""
+  labels:
+    openshift.io/cluster-monitoring: "true" 
+    product: openshift

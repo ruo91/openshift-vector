@@ -1,0 +1,125 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticsearch
+  labels:
+    app: elasticsearch
+    type: database
+    product: openshift
+  namespaces: vector
+spec:
+  selector:
+    app: elasticsearch
+    type: database
+    product: openshift
+  ports:
+    - port: 9200
+      targetPort: 9200
+---
+kind: Route
+apiVersion: route.openshift.io/v1
+metadata:
+  name: elasticsearch-vector
+  namespace: vector
+  labels:
+    app: elasticsearch
+    type: database
+    product: openshift
+spec:
+  host: elasticsearch-vector.apps.ocp4.ybkim.local
+  to:
+    kind: Service
+    name: elasticsearch
+    weight: 100
+  port:
+    targetPort: 9200
+  wildcardPolicy: None
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: elasticsearch
+  labels:
+    app: elasticsearch
+    type: database
+    product: openshift
+  namespaces: vector
+spec:
+  selector:
+    matchLabels:
+      app: elasticsearch
+      type: database
+  serviceName: elasticsearch
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: elasticsearch
+        type: database
+        product: openshift
+    spec:
+      initContainers:
+        - name: init-sysctl
+          image: docker.io/library/busybox:1.35.0
+          command:
+            - sysctl
+            - -w
+            - vm.max_map_count=262144
+          securityContext:
+            privileged: true
+      containers:
+        - name: elasticsearch
+          image: docker.elastic.co/elasticsearch/elasticsearch-oss:7.10.2-amd64
+          securityContext:
+            capabilities:
+              add: ["SYS_CHROOT"]
+          env:
+            - name: ES_JAVA_OPTS
+              value: "-Xms16g -Xmx16g"
+            - name: cluster.name
+              value: "elasticsearch"
+            - name: bootstrap.memory_lock
+              value: "false"
+            - name: network.host
+              value: "0.0.0.0"
+            - name: http.port
+              value: "9200"
+            - name: discovery.type
+              value: "single-node"
+            - name: indices.query.bool.max_clause_count
+              value: "8192"
+            - name: search.max_buckets
+              value: "100000"
+            - name: action.destructive_requires_name
+              value: "true"
+          ports:
+            - containerPort: 9200
+              name: http
+            - containerPort: 9300
+              name: transport
+          livenessProbe:
+            tcpSocket:
+              port: transport
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /_cluster/health
+              port: http
+            initialDelaySeconds: 20
+            timeoutSeconds: 5
+          volumeMounts:
+            - name: elasticsearch-data
+              mountPath: /usr/share/elasticsearch/data
+  volumeClaimTemplates:
+    - metadata:
+        name: elasticsearch-data
+        labels:
+          app: elasticsearch
+          product: openshift
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 200Gi

@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    app: vector-collector
+    product: openshift
+  name: vector-config
+  namespace: vector
+data:
+  vector.toml: |
+    #                                    __   __  __
+    #                                    \ \ / / / /
+    #                                     \ V / / /
+    #                                      \_/  \/
+    #
+    #                                    V E C T O R
+    #                                   Configuration
+    #
+    # ------------------------------------------------------------------------------
+    # Website: https://vector.dev
+    # Docs: https://vector.dev/docs
+    # Chat: https://chat.vector.dev
+    # ------------------------------------------------------------------------------
+    
+    # Change this to use a non-default directory for Vector data storage:
+    data_dir = "/vector/data"
+    
+    # Enable API
+    [api]
+    enabled = true
+    address = "0.0.0.0:8686"
+    
+    #### Input ####
+    [sources.containers_logs]
+    type = "file"
+    include = [ "/var/log/containers/*.log" ]
+    read_from = "beginning"
+    
+    #### Output ####
+    # ElasticSearch
+    [sinks.elasticsearch]
+    type = "elasticsearch"
+    inputs = [ "containers_logs" ]
+    endpoint = "http://elasticsearch-vector.apps.ocp4.ybkim.local"
+    #mode = "bulk"
+    bulk.action = "create"
+    bulk.index = "vector-%Y-%m-%d"
+    #pipeline = "vector"
+    compression = "none"

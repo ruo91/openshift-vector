@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: elasticsearch-pv
+  labels:
+    apps: elasticsearch-pv
+    product: openshift
+spec:
+  capacity:
+    storage: 200Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  #storageClassName: local-nfs-sc
+  nfs:
+    path: /data/nfs/elasticsearch
+    server: nas.ocp4.ybkim.local
